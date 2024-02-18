@@ -37,7 +37,7 @@ Ensure you demonstrate your work on one of the online compilers and send a link.
 - https://www.programiz.com/golang/online-compiler/
 - https://go.dev/play/
 - https://onecompiler.com/
-- https://replit.com/~
+- https://replit.com/
 
 In these systems, you can usually select the programming language for your interview in the top-right or side-left menu.
 
@@ -79,11 +79,11 @@ If you have significant questions about the meaning of this task, you may write 
 Приветствуется описание вариантов использования функций вашего класса (например, в виде комментариев или мини документации).
 
 Обязательно обеспечьте демонстрацию вашей работы на одном из онлайн компиляторов и пришлите ссылку. Вот примеры, онлайн компиляторов, Google предоставит больше:
-https://www.onlinegdb.com/
-https://www.programiz.com/golang/online-compiler/
-https://go.dev/play/
-https://onecompiler.com/
-https://replit.com/~
+- https://www.onlinegdb.com/
+- https://www.programiz.com/golang/online-compiler/
+- https://go.dev/play/
+- https://onecompiler.com/
+- https://replit.com/
 
 В указанных системах обычно сверху-справа, либо сбоку-слева можно выбрать тот язык программирования, на который вы проходите собеседование.
 Если вы не справились с размещением на онлайн компиляторе, тогда создайте исчерпывающую инструкцию как запустить ваш код.
