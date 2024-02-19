@@ -658,16 +658,16 @@ func main() {
 	wg := sync.WaitGroup{}
 
 	// Get IBAN of emission account
-	executeUseCase1()
+	testGettingEmissionIBAN()
 
 	// Get IBAN of destruction account
-	executeUseCase2()
+	testGettingDestructionIBAN()
 
 	// Attempt to open a new ordinary account and topping up the balance (failure)
-	executeUseCase3()
+	testAccountOpeningAndTopupFailure()
 
 	// Attempt to open a new ordinary account with zero balance (success)
-	executeUseCase5()
+	testZeroBalanceAccountOpening()
 
 	// Open multiple ordinary accounts and topping up the balances in parallel
 	const n int = 20
@@ -675,25 +675,25 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			executeUseCase4()
+			testAccountOpeningAndTopupSuccess()
 		}()
 	}
 	wg.Wait()
 
 	// Attempt to destruct money (failure)
-	executeUseCase6()
+	testMoneyDestructionFailure()
 
 	// Attempt to emit money (success)
-	executeUseCase7()
+	testMoneyEmissionSuccess()
 
 	// Attempt to destruct money (success)
-	executeUseCase8()
+	testMoneyDestructionSuccess()
 
 	// Attempt to transfer money between accounts (success)
-	executeUseCase10()
+	testSuccessfulMoneyTransfer()
 
 	// Attempt to transfer money between accounts (failure)
-	executeUseCase11()
+	testFailedMoneyTransfer()
 
 	// Testing concurrency by performing M money transfers in parallel
 	const m int = 100
@@ -701,17 +701,17 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			executeUseCase12()
+			testMoneyTransferViaJson()
 		}()
 	}
 	wg.Wait()
 
 	// Print all accounts details
-	executeUseCase9()
+	testAllAccountDetailsPrinting()
 }
 
 // Get IBAN of emission account
-func executeUseCase1() {
+func testGettingEmissionIBAN() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 1: getting emission account IBAN\n")
 	iban, err := accountRepoImpl.RetrieveEmissionAccountIban()
@@ -725,7 +725,7 @@ func executeUseCase1() {
 }
 
 // Get IBAN of destruction account
-func executeUseCase2() {
+func testGettingDestructionIBAN() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 2: getting destruction account IBAN\n")
 	iban, err := accountRepoImpl.RetrieveDestructionAccountIban()
@@ -739,7 +739,7 @@ func executeUseCase2() {
 }
 
 // Open a new ordinary account and topping up the balance (failure)
-func executeUseCase3() {
+func testAccountOpeningAndTopupFailure() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 3: failing to open a new account and top up its balance\n")
 	acc, err := accountRepoImpl.OpenAccount()
@@ -756,7 +756,7 @@ func executeUseCase3() {
 }
 
 // Open a new ordinary account and topping up the balance (success)
-func executeUseCase4() {
+func testAccountOpeningAndTopupSuccess() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 4: presumably successfully opening a new account and topping up its balance\n")
 	acc, err := accountRepoImpl.OpenAccount()
@@ -783,7 +783,7 @@ func executeUseCase4() {
 }
 
 // Open a new ordinary account with zero balance (success)
-func executeUseCase5() {
+func testZeroBalanceAccountOpening() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 5: presumably successfully opening an account with zero balance\n")
 	acc, err := accountRepoImpl.OpenAccount()
@@ -792,15 +792,15 @@ func executeUseCase5() {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %f", acc.Iban, float64(0)))
+	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %f", acc.Iban, acc.Balance))
 	fmt.Println(builder.String())
 }
 
 // Destruct money (failure)
-func executeUseCase6() {
+func testMoneyDestructionFailure() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 6: failing to destruct money\n")
-	err := accountRepoImpl.DestructMoney("BY84 ALFA 1000 0000 0000 0000 0000", 10)
+	err := accountRepoImpl.DestructMoney("BY84 ALFA 1000 0000 0000 0000 0000", -10000)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -808,7 +808,7 @@ func executeUseCase6() {
 }
 
 // Emit money (success)
-func executeUseCase7() {
+func testMoneyEmissionSuccess() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 7: presumably successfully emitting money\n")
 	var amount float64 = 250
@@ -823,7 +823,7 @@ func executeUseCase7() {
 }
 
 // Destruct money (success)
-func executeUseCase8() {
+func testMoneyDestructionSuccess() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 8: presumably successfully destructing money\n")
 	var amount float64 = 10
@@ -839,7 +839,7 @@ func executeUseCase8() {
 }
 
 // Print all accounts details
-func executeUseCase9() {
+func testAllAccountDetailsPrinting() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 9: printing IBAN, balance and status of all existing accounts including special and ordinary\n")
 	res, err := accountRepoImpl.RetrieveAllAccountsAsJson()
@@ -853,7 +853,7 @@ func executeUseCase9() {
 }
 
 // Transfer money between accounts (success)
-func executeUseCase10() {
+func testSuccessfulMoneyTransfer() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 10: presumably successfully transferring money between accounts\n")
 	sender := "BY84 ALFA 1000 0000 0000 0000 0000"
@@ -870,7 +870,7 @@ func executeUseCase10() {
 }
 
 // Transfer money between accounts (failure)
-func executeUseCase11() {
+func testFailedMoneyTransfer() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 11: failing to transfer money between accounts\n")
 	// Blocking an account to fail the subsequent money transfer attempt
@@ -893,7 +893,7 @@ func executeUseCase11() {
 }
 
 // Picking two random accounts and transferring money between them via JSON request
-func executeUseCase12() {
+func testMoneyTransferViaJson() {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 12: picking two random accounts and transferring money between them\n")
 	str, err := accountRepoImpl.RetrieveAllAccountsAsJson()
