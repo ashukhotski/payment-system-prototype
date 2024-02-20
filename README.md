@@ -1,6 +1,6 @@
 **Payment System Prototype**
 
-Go Playground: https://go.dev/play/p/TO8mXtyffWV
+Go Playground: https://go.dev/play/p/3re0mHiiQJN
 
 **English:** 
 Create one or more "classes" that will emulate the operation of a basic payment system.

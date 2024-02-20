@@ -297,53 +297,55 @@ type AccountRepository interface {
 	ActivateAccount(iban string) error
 }
 
-var accountRepoImpl AccountRepository
-
-func SetAccountRepository(r AccountRepository) {
-	accountRepoImpl = r
+type AccountService struct {
+	accountRepoImpl AccountRepository
 }
 
-func RetrieveEmissionAccountIban() (string, error) {
-	return accountRepoImpl.RetrieveEmissionAccountIban()
+func NewAccountService(r AccountRepository) *AccountService {
+	return &AccountService{r}
 }
 
-func RetrieveDestructionAccountIban() (string, error) {
-	return accountRepoImpl.RetrieveDestructionAccountIban()
+func (s *AccountService) RetrieveEmissionAccountIban() (string, error) {
+	return s.accountRepoImpl.RetrieveEmissionAccountIban()
 }
 
-func EmitMoney(amount float64) error {
-	return accountRepoImpl.EmitMoney(amount)
+func (s *AccountService) RetrieveDestructionAccountIban() (string, error) {
+	return s.accountRepoImpl.RetrieveDestructionAccountIban()
 }
 
-func DestructMoney(iban string, amount float64) error {
-	return accountRepoImpl.DestructMoney(iban, amount)
+func (s *AccountService) EmitMoney(amount float64) error {
+	return s.accountRepoImpl.EmitMoney(amount)
+}
+
+func (s *AccountService) DestructMoney(iban string, amount float64) error {
+	return s.accountRepoImpl.DestructMoney(iban, amount)
 }
 
 // Not passing account type assuming this method opens only ordinary accounts, not special accounts for monetary emmision and destruction
 // Not passing account status assuming a newly opened account should be active immediately (this behavior can be change to comply with KYC)
 // Not passing initial balance assuming it should only be topped up from the emission account by making a money transfer between accounts
-func OpenAccount() (*Account, error) {
-	return accountRepoImpl.OpenAccount()
+func (s *AccountService) OpenAccount() (*Account, error) {
+	return s.accountRepoImpl.OpenAccount()
 }
 
-func TransferMoney(sender, recipient string, amount float64) error {
-	return accountRepoImpl.TransferMoney(sender, recipient, amount)
+func (s *AccountService) TransferMoney(sender, recipient string, amount float64) error {
+	return s.accountRepoImpl.TransferMoney(sender, recipient, amount)
 }
 
-func TransferMoneyJson(jsonStr string) error {
-	return accountRepoImpl.TransferMoneyJson(jsonStr)
+func (s *AccountService) TransferMoneyJson(jsonStr string) error {
+	return s.accountRepoImpl.TransferMoneyJson(jsonStr)
 }
 
-func RetrieveAllAccountsAsJson() (string, error) {
-	return accountRepoImpl.RetrieveAllAccountsAsJson()
+func (s *AccountService) RetrieveAllAccountsAsJson() (string, error) {
+	return s.accountRepoImpl.RetrieveAllAccountsAsJson()
 }
 
-func BlockAccount(iban string) error {
-	return accountRepoImpl.BlockAccount(iban)
+func (s *AccountService) BlockAccount(iban string) error {
+	return s.accountRepoImpl.BlockAccount(iban)
 }
 
-func ActivateAccount(iban string) error {
-	return accountRepoImpl.ActivateAccount(iban)
+func (s *AccountService) ActivateAccount(iban string) error {
+	return s.accountRepoImpl.ActivateAccount(iban)
 }
 
 // --------------------------------------------------------
@@ -651,23 +653,25 @@ func (r *InMemoryAccountRepository) ActivateAccount(iban string) error {
 func init() {
 	rand.Seed(time.Now().UnixNano())
 	locale = English
-	SetAccountRepository(NewInMemoryAccountRepository("BY84 ALFA 1000 0000 0000 0000 0000", "BY84 ALFA 1000 0000 0000 0000 0001"))
 }
 
 func main() {
+	inMemRepoImpl := NewInMemoryAccountRepository("BY84 ALFA 1000 0000 0000 0000 0000", "BY84 ALFA 1000 0000 0000 0000 0001")
+	service := NewAccountService(inMemRepoImpl)
+
 	wg := sync.WaitGroup{}
 
 	// Get IBAN of emission account
-	testGettingEmissionIBAN()
+	testGettingEmissionIBAN(service)
 
 	// Get IBAN of destruction account
-	testGettingDestructionIBAN()
+	testGettingDestructionIBAN(service)
 
 	// Attempt to open a new ordinary account and topping up the balance (failure)
-	testAccountOpeningAndTopupFailure()
+	testAccountOpeningAndTopupFailure(service)
 
 	// Attempt to open a new ordinary account with zero balance (success)
-	testZeroBalanceAccountOpening()
+	testZeroBalanceAccountOpening(service)
 
 	// Open multiple ordinary accounts and topping up the balances in parallel
 	const n int = 20
@@ -675,25 +679,25 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			testAccountOpeningAndTopupSuccess()
+			testAccountOpeningAndTopupSuccess(service)
 		}()
 	}
 	wg.Wait()
 
 	// Attempt to destruct money (failure)
-	testMoneyDestructionFailure()
+	testMoneyDestructionFailure(service)
 
 	// Attempt to emit money (success)
-	testMoneyEmissionSuccess()
+	testMoneyEmissionSuccess(service)
 
 	// Attempt to destruct money (success)
-	testMoneyDestructionSuccess()
+	testMoneyDestructionSuccess(service)
 
 	// Attempt to transfer money between accounts (success)
-	testSuccessfulMoneyTransfer()
+	testSuccessfulMoneyTransfer(service)
 
 	// Attempt to transfer money between accounts (failure)
-	testFailedMoneyTransfer()
+	testFailedMoneyTransfer(service)
 
 	// Testing concurrency by performing M money transfers in parallel
 	const m int = 100
@@ -701,20 +705,20 @@ func main() {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			testMoneyTransferViaJson()
+			testMoneyTransferViaJson(service)
 		}()
 	}
 	wg.Wait()
 
 	// Print all accounts details
-	testAllAccountDetailsPrinting()
+	testAllAccountDetailsPrinting(service)
 }
 
 // Get IBAN of emission account
-func testGettingEmissionIBAN() {
+func testGettingEmissionIBAN(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 1: getting emission account IBAN\n")
-	iban, err := accountRepoImpl.RetrieveEmissionAccountIban()
+	iban, err := service.RetrieveEmissionAccountIban()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -725,10 +729,10 @@ func testGettingEmissionIBAN() {
 }
 
 // Get IBAN of destruction account
-func testGettingDestructionIBAN() {
+func testGettingDestructionIBAN(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 2: getting destruction account IBAN\n")
-	iban, err := accountRepoImpl.RetrieveDestructionAccountIban()
+	iban, err := service.RetrieveDestructionAccountIban()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -739,16 +743,16 @@ func testGettingDestructionIBAN() {
 }
 
 // Open a new ordinary account and topping up the balance (failure)
-func testAccountOpeningAndTopupFailure() {
+func testAccountOpeningAndTopupFailure(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 3: failing to open a new account and top up its balance\n")
-	acc, err := accountRepoImpl.OpenAccount()
+	acc, err := service.OpenAccount()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
 		return
 	}
-	err = accountRepoImpl.TransferMoney("BY84 ALFA 1000 0000 0000 0000 0000", acc.Iban, -23.48)
+	err = service.TransferMoney("BY84 ALFA 1000 0000 0000 0000 0000", acc.Iban, -23.48)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -756,23 +760,23 @@ func testAccountOpeningAndTopupFailure() {
 }
 
 // Open a new ordinary account and topping up the balance (success)
-func testAccountOpeningAndTopupSuccess() {
+func testAccountOpeningAndTopupSuccess(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 4: presumably successfully opening a new account and topping up its balance\n")
-	acc, err := accountRepoImpl.OpenAccount()
+	acc, err := service.OpenAccount()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
 		return
 	}
 	var amount float64 = rand.Float64() * float64(rand.Intn(1000))
-	err = accountRepoImpl.EmitMoney(amount)
+	err = service.EmitMoney(amount)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
 		return
 	}
-	err = accountRepoImpl.TransferMoney("BY84 ALFA 1000 0000 0000 0000 0000", acc.Iban, amount)
+	err = service.TransferMoney("BY84 ALFA 1000 0000 0000 0000 0000", acc.Iban, amount)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -783,10 +787,10 @@ func testAccountOpeningAndTopupSuccess() {
 }
 
 // Open a new ordinary account with zero balance (success)
-func testZeroBalanceAccountOpening() {
+func testZeroBalanceAccountOpening(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 5: presumably successfully opening an account with zero balance\n")
-	acc, err := accountRepoImpl.OpenAccount()
+	acc, err := service.OpenAccount()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -797,10 +801,10 @@ func testZeroBalanceAccountOpening() {
 }
 
 // Destruct money (failure)
-func testMoneyDestructionFailure() {
+func testMoneyDestructionFailure(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 6: failing to destruct money\n")
-	err := accountRepoImpl.DestructMoney("BY84 ALFA 1000 0000 0000 0000 0000", -10000)
+	err := service.DestructMoney("BY84 ALFA 1000 0000 0000 0000 0000", -10000)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -808,11 +812,11 @@ func testMoneyDestructionFailure() {
 }
 
 // Emit money (success)
-func testMoneyEmissionSuccess() {
+func testMoneyEmissionSuccess(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 7: presumably successfully emitting money\n")
 	var amount float64 = 250
-	err := accountRepoImpl.EmitMoney(amount)
+	err := service.EmitMoney(amount)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -823,12 +827,12 @@ func testMoneyEmissionSuccess() {
 }
 
 // Destruct money (success)
-func testMoneyDestructionSuccess() {
+func testMoneyDestructionSuccess(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 8: presumably successfully destructing money\n")
 	var amount float64 = 10
 	iban := "BY84 ALFA 1000 0000 0000 0000 0000"
-	err := accountRepoImpl.DestructMoney(iban, amount)
+	err := service.DestructMoney(iban, amount)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -839,10 +843,10 @@ func testMoneyDestructionSuccess() {
 }
 
 // Print all accounts details
-func testAllAccountDetailsPrinting() {
+func testAllAccountDetailsPrinting(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 9: printing IBAN, balance and status of all existing accounts including special and ordinary\n")
-	res, err := accountRepoImpl.RetrieveAllAccountsAsJson()
+	res, err := service.RetrieveAllAccountsAsJson()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -853,13 +857,13 @@ func testAllAccountDetailsPrinting() {
 }
 
 // Transfer money between accounts (success)
-func testSuccessfulMoneyTransfer() {
+func testSuccessfulMoneyTransfer(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 10: presumably successfully transferring money between accounts\n")
 	sender := "BY84 ALFA 1000 0000 0000 0000 0000"
 	recipient := "BY84 ALFA 1000 0000 0000 0000 0001"
 	var amount float64 = 50
-	err := accountRepoImpl.TransferMoney(sender, recipient, amount)
+	err := service.TransferMoney(sender, recipient, amount)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -870,22 +874,22 @@ func testSuccessfulMoneyTransfer() {
 }
 
 // Transfer money between accounts (failure)
-func testFailedMoneyTransfer() {
+func testFailedMoneyTransfer(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 11: failing to transfer money between accounts\n")
 	// Blocking an account to fail the subsequent money transfer attempt
-	err := accountRepoImpl.BlockAccount("BY84 ALFA 1000 0000 0000 0000 0000")
+	err := service.BlockAccount("BY84 ALFA 1000 0000 0000 0000 0000")
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
 		return
 	}
-	err = accountRepoImpl.TransferMoney("BY84 ALFA 1000 0000 0000 0000 0000", "BY84 ALFA 1000 0000 0000 0000 0001", 50)
+	err = service.TransferMoney("BY84 ALFA 1000 0000 0000 0000 0000", "BY84 ALFA 1000 0000 0000 0000 0001", 50)
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 	}
 	// Activating account again to remove the block set earlier, so that future operations won't be affected by this use case
-	err = accountRepoImpl.ActivateAccount("BY84 ALFA 1000 0000 0000 0000 0000")
+	err = service.ActivateAccount("BY84 ALFA 1000 0000 0000 0000 0000")
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 	}
@@ -893,10 +897,10 @@ func testFailedMoneyTransfer() {
 }
 
 // Picking two random accounts and transferring money between them via JSON request
-func testMoneyTransferViaJson() {
+func testMoneyTransferViaJson(service *AccountService) {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "Use Case 12: picking two random accounts and transferring money between them\n")
-	str, err := accountRepoImpl.RetrieveAllAccountsAsJson()
+	str, err := service.RetrieveAllAccountsAsJson()
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
@@ -939,7 +943,7 @@ func testMoneyTransferViaJson() {
 	}
 	fmt.Fprintf(&builder, fmt.Sprintf("JSON: %s\n", string(jsonStr)))
 
-	err = accountRepoImpl.TransferMoneyJson(string(jsonStr))
+	err = service.TransferMoneyJson(string(jsonStr))
 	if err != nil {
 		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
 		fmt.Println(builder.String())
