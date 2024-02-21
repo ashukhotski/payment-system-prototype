@@ -27,6 +27,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -134,16 +135,28 @@ const (
 // --------------------------------------------------------
 // Defining account structure properties
 type Account struct {
-	Iban    string
-	Status  AccountStatus
-	Type    AccountType
-	Balance float64
+	Iban      string
+	Status    AccountStatus
+	Type      AccountType
+	Balance   float64
+	Fractions float64
 	// can be augmented with account holder details
 	// can be augmented with other properties such as the timestamp of last modification and so on
 }
 
+func round(amount float64) float64 {
+	return math.Round(amount*100) / 100
+}
+
+func roundAndExtractFractions(amount float64) (float64, float64) {
+	var rounded float64 = math.Round(amount*100) / 100
+	fractions := amount - rounded
+	return rounded, fractions
+}
+
 func NewAccount(iban string, s AccountStatus, t AccountType, b float64) *Account {
-	return &Account{iban, s, t, b}
+	r, f := roundAndExtractFractions(b)
+	return &Account{iban, s, t, r, f}
 }
 
 func (acc *Account) Block() {
@@ -155,11 +168,19 @@ func (acc *Account) Activate() {
 }
 
 func (acc *Account) Deduct(amount float64) {
-	acc.Balance -= amount
+	r, f := roundAndExtractFractions(amount)
+	acc.Balance -= r
+	acc.Fractions -= f
+
+	acc.Balance = round(acc.Balance)
 }
 
 func (acc *Account) Add(amount float64) {
-	acc.Balance += amount
+	r, f := roundAndExtractFractions(amount)
+	acc.Balance += r
+	acc.Fractions += f
+
+	acc.Balance = round(acc.Balance)
 }
 
 // Helper functions to validate and generate IBAN
@@ -361,8 +382,8 @@ type InMemoryAccountRepository struct {
 func NewInMemoryAccountRepository(eIban, dIban string) *InMemoryAccountRepository {
 	eIban = strings.Replace(eIban, " ", "", -1)
 	dIban = strings.Replace(dIban, " ", "", -1)
-	emissionAcc := &Account{eIban, Active, MonetaryEmission, 0}
-	destructionAcc := &Account{dIban, Active, MonetaryDestruction, 0}
+	emissionAcc := NewAccount(eIban, Active, MonetaryEmission, 0)
+	destructionAcc := NewAccount(dIban, Active, MonetaryDestruction, 0)
 	accounts := map[string]*Account{
 		eIban: emissionAcc,
 		dIban: destructionAcc,
@@ -473,7 +494,7 @@ func (r *InMemoryAccountRepository) DestructMoney(iban string, amount float64) e
 		return fmt.Errorf(errorCodesToMessagesMap[AccountIsBlockedError][locale])
 	}
 	// Checking if the account balance is sufficient to deduct the given amount
-	if acc.Balance < amount {
+	if r, _ := roundAndExtractFractions(amount); acc.Balance < r {
 		return fmt.Errorf(errorCodesToMessagesMap[InsufficientAccountBalanceError][locale])
 	}
 
@@ -500,7 +521,7 @@ func (r *InMemoryAccountRepository) OpenAccount() (*Account, error) {
 	}
 
 	// Creating a new account and adding it to the account storage
-	acc := &Account{iban, Active, Ordinary, 0}
+	acc := NewAccount(iban, Active, Ordinary, 0)
 	r.Accounts[iban] = acc
 	return acc, nil
 }
@@ -530,7 +551,7 @@ func (r *InMemoryAccountRepository) TransferMoney(sender, recipient string, amou
 		return fmt.Errorf(errorCodesToMessagesMap[NegativeAmountError][locale])
 	}
 	//Checking if sender has sufficient balance to transfer the amount to recipient
-	if sAcc.Balance < amount {
+	if r, _ := roundAndExtractFractions(amount); sAcc.Balance < r {
 		return fmt.Errorf(errorCodesToMessagesMap[InsufficientAccountBalanceError][locale])
 	}
 	// Checking if recipient account exists
@@ -574,20 +595,21 @@ func (r *InMemoryAccountRepository) RetrieveAllAccountsAsJson() (string, error) 
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
 	type accountDetails struct {
-		Iban    string  `json:"iban"`
-		Balance float64 `json:"balance"`
-		Status  string  `json:"status"`
+		Iban      string  `json:"iban"`
+		Balance   float64 `json:"balance"`
+		Fractions float64 `json:"fractions"`
+		Status    string  `json:"status"`
 	}
 	allAccountDetails := []accountDetails{}
 	if r.EmissionAccount != nil {
-		allAccountDetails = append(allAccountDetails, accountDetails{r.EmissionAccount.Iban, r.EmissionAccount.Balance, accountStatusCodeToNameMap[r.EmissionAccount.Status][locale]})
+		allAccountDetails = append(allAccountDetails, accountDetails{r.EmissionAccount.Iban, r.EmissionAccount.Balance, r.EmissionAccount.Fractions, accountStatusCodeToNameMap[r.EmissionAccount.Status][locale]})
 	}
 	if r.DestructionAccount != nil {
-		allAccountDetails = append(allAccountDetails, accountDetails{r.DestructionAccount.Iban, r.DestructionAccount.Balance, accountStatusCodeToNameMap[r.DestructionAccount.Status][locale]})
+		allAccountDetails = append(allAccountDetails, accountDetails{r.DestructionAccount.Iban, r.DestructionAccount.Balance, r.DestructionAccount.Fractions, accountStatusCodeToNameMap[r.DestructionAccount.Status][locale]})
 	}
 	for _, acc := range r.Accounts {
 		if acc != r.EmissionAccount && acc != r.DestructionAccount {
-			allAccountDetails = append(allAccountDetails, accountDetails{acc.Iban, acc.Balance, accountStatusCodeToNameMap[acc.Status][locale]})
+			allAccountDetails = append(allAccountDetails, accountDetails{acc.Iban, acc.Balance, acc.Fractions, accountStatusCodeToNameMap[acc.Status][locale]})
 		}
 	}
 	output, err := json.Marshal(allAccountDetails)
@@ -782,7 +804,7 @@ func testAccountOpeningAndTopupSuccess(service *AccountService) {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %f", acc.Iban, amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %.2f", acc.Iban, round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -796,7 +818,7 @@ func testZeroBalanceAccountOpening(service *AccountService) {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %f", acc.Iban, acc.Balance))
+	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %.2f", acc.Iban, acc.Balance))
 	fmt.Println(builder.String())
 }
 
@@ -822,7 +844,7 @@ func testMoneyEmissionSuccess(service *AccountService) {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money emitted: %f\n", amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money emitted: %.2f\n", round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -838,7 +860,7 @@ func testMoneyDestructionSuccess(service *AccountService) {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money destructed to %s: %f\n", iban, amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money destructed to %s: %.2f\n", iban, round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -869,7 +891,7 @@ func testSuccessfulMoneyTransfer(service *AccountService) {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %f\n", sender, recipient, amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %.2f\n", sender, recipient, round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -949,6 +971,6 @@ func testMoneyTransferViaJson(service *AccountService) {
 		fmt.Println(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %f\n", mt.Sender, mt.Recipient, mt.Amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %.2f\n", mt.Sender, mt.Recipient, round(mt.Amount)))
 	fmt.Println(builder.String())
 }

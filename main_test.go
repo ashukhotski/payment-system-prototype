@@ -1,5 +1,6 @@
 // Author: Alexandr Shukhotskiy
-// Task:
+// Testing main.go functionality
+// Original task:
 // - implement a prototype of payments processing system
 // - ensure an account entity contains IBAN, balance and status attributes
 // - ensure there are two special accounts (one for money emission and one for money destruction) besides ordinary accounts
@@ -11,17 +12,6 @@
 // -- ability to open a new account
 // -- ability to transfer money between any two accounts (either by passing variable parameters or json string)
 // -- ability to list IBAN, remaining balance and status of all existing accounts (emission, destruction, ordinary) in JSON format
-// System behavior can be tested by hardcoding several use case scenarios and executing them within the main function
-// Notes:
-// - I expanded the prototype with a few methods not mentioned in the original requirements to make it more complete:
-// -- methods to block and activate the account
-// Areas for improvement:
-// - refactor the code and split it into packages and files
-// - introduce service layer for external communication (http, grcp or tcp)
-// - add more methods to manipulate account repository
-// - introduce the queue (can be done via Go channels) and push messages there upon certain methods execution
-// - leverage blockchain or linked list data structure to implement financial transactions log, possibly integrate it with the queue
-// - implement better unit tests (a good task to delegate to junior and middle level developers)
 package main
 
 import (
@@ -134,7 +124,7 @@ func TestAccountOpeningAndTopupSuccess(t *testing.T) {
 		t.Errorf(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %f", acc.Iban, amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %.2f", acc.Iban, round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -153,7 +143,7 @@ func TestZeroBalanceAccountOpening(t *testing.T) {
 		t.Errorf(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %f", acc.Iban, acc.Balance))
+	fmt.Fprintf(&builder, fmt.Sprintf("IBAN %s: %.2f", acc.Iban, acc.Balance))
 	fmt.Println(builder.String())
 }
 
@@ -191,7 +181,7 @@ func TestMoneyEmissionSuccess(t *testing.T) {
 		t.Errorf(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money emitted: %f\n", amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money emitted: %.2f\n", round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -218,7 +208,7 @@ func TestMoneyDestructionSuccess(t *testing.T) {
 		t.Errorf(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money destructed to %s: %f\n", iban, amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money destructed to %s: %.2f\n", iban, round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -266,7 +256,7 @@ func TestSuccessfulMoneyTransfer(t *testing.T) {
 		t.Errorf(builder.String())
 		return
 	}
-	fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %f\n", sender, recipient, amount))
+	fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %.2f\n", sender, recipient, round(amount)))
 	fmt.Println(builder.String())
 }
 
@@ -398,10 +388,17 @@ func TestMoneyTransferViaJson(t *testing.T) {
 				fmt.Println(builder.String())
 				return
 			}
-			fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %f\n", mt.Sender, mt.Recipient, mt.Amount))
+			fmt.Fprintf(&builder, fmt.Sprintf("Money transfer from %s to %s: %.2f\n", mt.Sender, mt.Recipient, round(mt.Amount)))
 		}()
 	}
 	wg.Wait()
 
+	res, err := service.RetrieveAllAccountsAsJson()
+	if err != nil {
+		fmt.Fprintf(&builder, fmt.Sprintf("Error: %v\n", err))
+		t.Errorf(builder.String())
+		return
+	}
+	fmt.Fprintf(&builder, res)
 	fmt.Println(builder.String())
 }
